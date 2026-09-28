@@ -1,6 +1,8 @@
 # BenchEval implementation plan
 
-Status: proposed implementation contract; no implementation completed.
+Status: initial design contract; implementation evidence lives in
+[current-status.md](current-status.md). The approved incremental scope now includes
+Codex-first judging, controlled skills and a read-only local web inspector.
 Prepared: 2026-09-28.
 
 ## 1. Product contract
@@ -38,8 +40,8 @@ HTML report can follow once the artifact contract is stable.
 
 ## 2. Current sources and transfer strategy
 
-The target `/Users/elguajo/Documents/DEV/03_TOOLS/BenchEval` is an empty Git
-repository on `main`, with no commits at inspection. Its origin is
+At the initial inspection, `/Users/elguajo/Documents/DEV/03_TOOLS/BenchEval` was an
+empty Git repository on `main`. Its origin is
 `https://github.com/Elguajo/BenchEval.git`.
 
 Source paths, revisions, relevant files, and known limitations are recorded in

@@ -1,96 +1,128 @@
 # Implementation status — 2026-09-28
 
-Session classification: **IN PROGRESS**. The initial response slice works, but
-M0/M1 have open schema/judge work and the complete v1 (M0–M4) is not delivered.
-This repository has no Progressive Context Kit or `HANDOFF_PROTOCOL.md`; this file
-holds the compact implementation evidence and continuation context.
+Session classification: **PHASE COMPLETE** for the requested Codex-first
+judge/context/UI increment. The broader project is **IN PROGRESS**:
+coding-agent scenarios, suites/comparison, Claude and the DeepEval bridge remain
+undelivered. This checkout has no Progressive Context Kit, QUALITY_PROTOCOL.md
+or HANDOFF_PROTOCOL.md; this file preserves compact acceptance evidence.
 
 ## Delivered
 
-- Installable Python package and locked environment; `init`, `validate`, `doctor`,
-  response `run`, artifact `inspect`, and `version` commands.
-- Strict unknown-field/duplicate-key handling, instruction path containment,
-  content snapshots and SHA-256 hashes; inline JSON Schema validation with no
-  remote-reference resolution.
-- Independent outcome, instruction-fidelity and behavior verdicts. Hard violations
-  dominate; missing required evidence cannot become a pass; no averaged score.
-- Codex executor using the official CLI and existing ChatGPT login. No API-key
-  fallback or credential-file extraction. Temporary read-only execution, controlled
-  config overrides, per-user provider lock, timeout/cancellation of process groups,
-  captured streams and recognized JSONL tool events.
-- Exact-text, substring, regex, JSON Schema and observed no-tools checks. Local,
-  versioned, atomic final results and evidence-hash verification.
-- Attribution and exact source hashes for the local DeepEval Codex adaptation.
-  No AgentEval code port and no DeepEval runtime dependency yet.
+- Installable Python package, locked environment, response scenarios and fixed
+  exact/contains/regex/JSON-schema/no-tools checks.
+- Independent Outcome, Instruction fidelity and Behavior verdicts. Proven hard
+  failures dominate; missing mandatory evidence never becomes a guessed pass.
+- Codex actor and independent Codex LLM judge using official CLI ChatGPT login.
+  Ephemeral read-only invocations, ignored user config/rules, restricted tools,
+  per-user provider lock, process-group timeout/cancellation and captured JSONL.
+- Controlled context by default: app-server skills/list discovery, per-invocation
+  skills.config disabling, second read-only verification with zero enabled skills.
+  No global settings/auth edits. Explicit ambient mode prints a warning.
+- Versioned judge jobs bound to verified actor artifacts and a rubric. Strict
+  structured verdicts with complete unique criterion IDs, explanations and
+  evidence references. Missing required evidence => NOT_OBSERVABLE; invalid
+  required decisions => INCONCLUSIVE. Existing hard failures are preserved.
+- Judge commands: export/run/import/inspect. Codex subscription automation,
+  actual desktop manual JSON hand-off, native Ollama and explicit
+  OpenAI-compatible Chat Completions API adapters. No automatic retries,
+  redirects, credential extraction or API fallback; job locks prevent concurrent
+  evaluation of the same job.
+- Loopback-only read-only web inspector: list/search/filter actor and judge
+  artifacts, three axes, combined findings, evidence and context metadata.
+  Pending exported jobs are represented explicitly. Text-only evidence rendering,
+  restrictive CSP, Host/Origin checks and no remote assets.
+- README rewritten with product positioning, working quick start, scenario/rubric
+  examples, provider workflows, UI preview, limitations, development and roadmap.
+  Layout/content inspiration from the upstream READMEs; original BenchEval text.
+- New judge/context/UI code is BenchEval-owned. Exact source attribution for the
+  local DeepEval Codex adaptation is retained. No source checkout was modified.
 
 ## Observed verification
 
-- `uv sync --python 3.12`: environment installed and `uv.lock` created.
-- Python 3.12.10; Codex CLI 0.147.0; `doctor` reported a ChatGPT login and all
-  required CLI flags available.
-- `uv run pytest -q`: **848 passed, 1 deselected**. Of these, 750 are the complete
-  3-axis hard-check state / execution-status decision-table permutations.
-  Default tests made no provider calls. The opt-in pytest live test was not run;
-  live verification used the CLI directly below.
+- Python 3.12.10, uv 0.10.12, Codex CLI 0.147.0.
+- `uv run bencheval doctor`: ChatGPT subscription login, required flags present;
+  **136 discovered skill paths, zero enabled at verified preflight**.
+- `uv run pytest -q`: **915 passed, 1 deselected**. Includes the 750 existing
+  verdict decision-table permutations and offline fake CLI/HTTP integration tests.
+  Covers context refusal/timeouts, immutable actor evidence, malformed/duplicate/
+  incomplete judge decisions, hard-fail preservation, missing trace, job locking,
+  native Codex judge transport, desktop imports, HTTP auth/quota/refusal/redirect/
+  timeout/oversize/truncation handling and local UI boundary checks.
 - `uv run ruff check .`: passed.
 - `uv run ruff format --check .`: passed.
-- `uv build`: source distribution and wheel built successfully; distributions
-  include Apache-2.0, NOTICE and the retained upstream license.
-- `validate examples/response/arithmetic.yaml`: valid, 3 checks.
-- Live `run examples/response/arithmetic.yaml`: **completed / PASS**, all three
-  axes PASS. JSON response satisfied both correctness and format checks; the
-  recognized complete event stream contained no tool actions.
-- `inspect` of that run: passed and verified saved evidence hashes.
+- `uv build`: source distribution and wheel built. Wheel inventory includes
+  the three web assets, judge modules and retained license/NOTICE files.
+- Live arithmetic actor: **completed / PASS**, all three axes PASS, recognized
+  complete trace with no tool actions; controlled skill metadata recorded.
+- Separate live Codex subscription judge: **completed / PASS**, both rubric
+  criteria PASS with evidence citations. Same-provider bias warning recorded.
+- Actor `inspect` and judge `inspect`: passed, including source/evidence hashes.
+- In-app browser: actor/judge detail rendering, source-actor navigation, search
+  empty state, role filtering and keyboard disclosure activation verified.
+  Desktop (1200 px) and narrow (375 px) layouts inspected; narrow DOM showed no
+  horizontal overflow. Console warning/error log query returned none.
+  In-app pointer automation was unreliable for some controls; keyboard activation
+  supplied functional evidence. No claim of cross-browser/full accessibility QA.
+- Ollama executable is installed, but `127.0.0.1:11434` refused connection.
+  Native/API adapters were exercised against local HTTP fixtures, not real
+  Ollama inference or paid external APIs. Actual desktop-app judging was not
+  performed; the manual import workflow was tested offline.
 
-Successful live artifact, local and ignored by Git:
-`.bencheval/runs/20260928T054858-76df5b810503/result.json`.
+Live artifacts, local and ignored:
 
-The initial live attempt
-`.bencheval/runs/20260928T054559-8660b6006dc4/result.json` remains unchanged:
-completed / INCONCLUSIVE because the parser initially did not recognize a nonfatal
-Codex `error` item. The raw trace identified the cause; a regression test now
-distinguishes those warning items from fatal top-level errors. Unknown item types,
-truncated streams, missing lifecycle markers and unfinished items still cannot
-establish complete observation. Both attempts consumed subscription usage.
+- Actor: `.bencheval/runs/20260928T062356-2255d4a7bac7/result.json`.
+- Judge: `.bencheval/judges/20260928T062815-bd5d24d0592d/result.json`.
 
-## Important boundaries
+Both calls consumed subscription usage. Earlier actor attempts
+`20260928T054559-8660b6006dc4` (INCONCLUSIVE) and
+`20260928T054858-76df5b810503` (PASS) remain unchanged.
 
-This is a **Codex actor plus deterministic evaluation**, not a Codex LLM judge.
-Claude, subjective rubric judging, coding-agent worktrees, protected filesystem
-checks, suites/comparison, the DeepEval bridge, and a web UI are not implemented.
+## Important decisions and boundaries
 
-Codex still discovers global skills despite ignored user config and a temporary
-working directory. The live attempt emitted a skill-catalog warning. Metadata
-explicitly marks ambient skills as not isolated and preserves CLI warnings.
-Consequently this is not a controlled instruction-variant A/B baseline yet. Do not
-silently fix this by copying authentication into another home or modifying global
-skills/configuration. The official CLI's auth store remains authoritative.
+- Codex CLI automation and actual desktop use are distinct transports. Desktop
+  mode is export/new-chat/import, not automation of an open app window. Identity,
+  auth, effective model and ambient desktop context cannot be verified.
+- Skill controls are a preflight snapshot, not a context-free model guarantee.
+  Native base/managed instructions remain; new skill files can race with exec.
+  Existing auth stays in the official CLI store; no credential copying.
+- Judge evidence contains explicit request/response/instructions and normalized
+  event kinds. Tool arguments/effects and filesystem history are not available.
+  Detailed protected-file/trajectory claims must not be inferred from that trace.
+- Same-provider judgments may share mistakes. Prompt-injection boundaries and
+  schema validation do not prove semantic accuracy; calibration is still needed.
+- HTTP providers require explicit models. Remote evidence transfer requires HTTPS
+  plus allow_remote; keys are environment-only and never logged. Compatibility
+  requires the documented strict structured-output contract, not every provider.
+  Proxy support is absent; DNS/header timing can exceed the body-read deadline.
+- UI is a trusted local developer inspector, not a public/multi-user service.
+  It performs no inference or configuration writes and must not be tunneled
+  publicly. Artifact hashes detect accidental change, not malicious re-signing.
+- Read-only execution is not a hostile-code sandbox. Scenario authors are trusted.
+  Python regex checks have no regex time budget; schema format is an annotation.
+- Effective model, billed cost and subscription quota stay unknown unless actually
+  reported. Local evidence and context metadata can contain private data.
 
-Read-only mode and feature restrictions are not isolation for hostile workloads.
-No-tools checks establish observed CLI activity only, not every hidden side effect.
-Scenario authors are trusted: checks use Python regex without a regex time budget,
-and cross-check contradiction detection currently covers hard `equals` conflicts,
-not arbitrary prose/regex/schema contradictions. JSON `format` is not asserted.
-The effective model, dollar cost and consumed subscription quota remain unknown
-unless the CLI actually reports them. Local evidence may contain private data.
+## Git and running services
 
-Changes are local and uncommitted. No push, PR, publication, instruction-directory
-import or source-repository changes were performed in this implementation slice.
+The previous bootstrap snapshot was committed/pushed to main as
+`597e49510de7b42a5cd34421aae977fdf0d92fd0`.
 
-## Next single-focus target
+This new increment is **local and uncommitted**; no new push/PR/publication occurred.
+No private instruction-directory import or upstream source edits occurred.
 
-Establish controlled Codex instruction delivery before a comparative benchmark:
-discover a supported way to disable/snapshot ambient skills for one invocation,
-without changing global configuration or moving/extracting credentials. Verify the
-chosen approach offline and with an explicit small live test. If the native CLI
-cannot establish this, retain the limitation in capability/comparison eligibility
-rather than claiming clean isolation. Coding-agent implementation remains queued
-as M2 in the [implementation plan](implementation-plan.md).
+The user-facing inspector is running at `http://127.0.0.1:8765/`.
+Restart from the repository root with `uv run bencheval ui --port 8765`;
+stop its local process with Ctrl+C. The in-app tab is kept as a deliverable.
 
-Copyable continuation prompt:
+## Single-focus continuation
 
-> Continue BenchEval from docs/current-status.md. Focus only on controlled Codex
-> instruction delivery: prevent or explicitly snapshot ambient skills/config for
-> one response run without changing global setup or copying credentials. Add
-> regression tests and verify a short live scenario if needed. Preserve existing
-> evidence and do not start coding-agent work or instruction comparisons yet.
+Next unresolved product target: implement one trusted coding-agent scenario for
+Codex with a fixed repository base, isolated worktree, fixed runner-owned tests
+and protected-file evidence. Do not label the existing response runner as a
+coding-agent benchmark. Claude remains deferred at the user's request.
+
+> Continue BenchEval from docs/current-status.md. Focus on one Codex coding-agent
+> vertical slice: a fixed trusted local fixture, controlled worktree/instructions,
+> runner-owned verification tests and protected-file checks with honest trace
+> coverage. Preserve existing response/judge artifacts and unrelated changes.
+> Keep Claude, suite comparison and hosted UI outside this increment.

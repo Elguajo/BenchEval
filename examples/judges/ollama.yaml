@@ -1,0 +1,10 @@
+# Replace with a model shown by `ollama list`. BenchEval never downloads a model.
+provider: ollama
+model: YOUR_INSTALLED_MODEL
+base_url: http://127.0.0.1:11434
+timeout_seconds: 120
+criteria:
+  - id: answer-quality
+    axes: [outcome]
+    severity: hard
+    requirement: The response addresses the request correctly and without irrelevant content.

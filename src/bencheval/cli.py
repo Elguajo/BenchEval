@@ -9,12 +9,21 @@ import typer
 
 from bencheval import __version__
 from bencheval.artifacts import ArtifactError, read_result
+from bencheval.codex_context import controlled_context
 from bencheval.contracts import RunResult, Verdict
-from bencheval.executors.codex import probe_codex
+from bencheval.executors.codex import OVERRIDES, child_environment, probe_codex
+from bencheval.judges.contracts import JudgeResult
+from bencheval.judges.evaluate import import_verdict, read_judge_result, run_job
+from bencheval.judges.jobs import JudgeError, prepare_job
 from bencheval.runner import run_scenario
 from bencheval.scenarios import ScenarioError, load_instructions, load_scenario
+from bencheval.ui import make_server
 
 app = typer.Typer(no_args_is_help=True, help="Instruction-aware LLM evaluation.")
+judge_app = typer.Typer(
+    no_args_is_help=True, help="Independent LLM judging of preserved actor runs."
+)
+app.add_typer(judge_app, name="judge")
 
 STARTER = """version: 1
 id: arithmetic
@@ -79,6 +88,89 @@ def summarize(result: RunResult, path: Path) -> None:
     typer.echo(f"Artifacts: {path.resolve()}")
 
 
+def summarize_judge(result: JudgeResult, path: Path) -> None:
+    typer.echo(f"Overall: {result.verdicts.overall} (actor checks + judge rubric)")
+    typer.echo(f"Judge: {result.invocation.provider} / {result.invocation.status}")
+    for axis, verdict in result.verdicts.axes.items():
+        typer.echo(f"{axis}: {verdict}")
+    for check in result.checks:
+        typer.echo(f"  {check.id}: {check.state} ({check.actual})")
+    for warning in result.warnings:
+        typer.echo(f"WARNING: {warning}")
+    if result.invocation.reason:
+        typer.echo(f"Reason: {result.invocation.reason}")
+    typer.echo(f"Artifacts: {path.resolve()}")
+
+
+def exit_verdict(verdict: Verdict) -> None:
+    if verdict == Verdict.FAIL:
+        raise typer.Exit(1)
+    if verdict != Verdict.PASS:
+        raise typer.Exit(3)
+
+
+@judge_app.command("export")
+def judge_export(
+    source: Path,
+    config: Annotated[Path, typer.Option(help="Explicit judge YAML configuration.")],
+    output: Path = Path(".bencheval/judges"),
+) -> None:
+    """Snapshot a verified actor run and rubric, without calling a model."""
+    try:
+        job, directory = prepare_job(source, config, output)
+    except (JudgeError, ArtifactError, OSError) as error:
+        fail(error)
+    typer.echo(f"Judge job: {job.id} ({job.config.provider})")
+    typer.echo(f"Prompt: {(directory / 'prompt.txt').resolve()}")
+    typer.echo(
+        "For desktop mode, paste this prompt into a NEW Codex chat, "
+        "then import its JSON reply."
+    )
+
+
+@judge_app.command("run")
+def judge_run(
+    source: Path,
+    config: Annotated[Path, typer.Option(help="Explicit judge YAML configuration.")],
+    output: Path = Path(".bencheval/judges"),
+) -> None:
+    """Judge a saved run through Codex, Ollama or an OpenAI-compatible API."""
+    try:
+        job, directory = prepare_job(source, config, output)
+        if job.config.allow_remote:
+            typer.echo(
+                "NOTICE: Sending snapshotted evidence to the "
+                "explicitly configured remote judge."
+            )
+        typer.echo(f"Judge artifacts: {directory.resolve()}")
+        result = run_job(directory)
+    except (JudgeError, ArtifactError, OSError) as error:
+        fail(error)
+    summarize_judge(result, directory)
+    exit_verdict(result.verdicts.overall)
+
+
+@judge_app.command("import")
+def judge_import(job: Path, reply: Path) -> None:
+    """Validate a desktop JSON reply and finalize its exported job exactly once."""
+    try:
+        result = import_verdict(job, reply)
+    except (JudgeError, OSError) as error:
+        fail(error)
+    summarize_judge(result, job if job.is_dir() else job.parent)
+    exit_verdict(result.verdicts.overall)
+
+
+@judge_app.command("inspect")
+def judge_inspect(path: Path) -> None:
+    """Verify a saved judge result and its source evidence, without model calls."""
+    try:
+        result = read_judge_result(path)
+    except JudgeError as error:
+        fail(error)
+    summarize_judge(result, path if path.is_dir() else path.parent)
+
+
 @app.command()
 def version() -> None:
     """Print the installed BenchEval version."""
@@ -114,6 +206,21 @@ def doctor() -> None:
     try:
         with tempfile.TemporaryDirectory(prefix="bencheval-doctor-") as name:
             probe = probe_codex("codex", Path(name))
+            if probe["available"]:
+                try:
+                    context = controlled_context(
+                        probe["binary"], Path(name), child_environment(), OVERRIDES
+                    )
+                    probe["context"] = {
+                        k: v for k, v in context.items() if k != "disabled_paths"
+                    }
+                except OSError:
+                    probe["available"] = False
+                    probe["reason"] = (
+                        "Controlled context unavailable. Update Codex or explicitly "
+                        "choose ambient mode; disable skills/global instructions "
+                        "manually before comparisons."
+                    )
     except OSError as error:
         fail(error)
     typer.echo(json.dumps(probe, indent=2))
@@ -130,6 +237,13 @@ def run(
 ) -> None:
     """Run a response scenario through the locally authenticated Codex CLI."""
     try:
+        scenario = load_scenario(path)
+        if scenario.executor.context_mode == "ambient":
+            typer.echo(
+                "WARNING: Ambient Codex context. Disable global skills/instructions "
+                "before comparisons; this run is not controlled.",
+                err=True,
+            )
         result, directory = run_scenario(path, output)
     except (ScenarioError, OSError) as error:
         fail(error)
@@ -138,6 +252,24 @@ def run(
         raise typer.Exit(1)
     if result.verdicts.overall != Verdict.PASS:
         raise typer.Exit(3)
+
+
+@app.command()
+def ui(
+    runs: Path = Path(".bencheval/runs"),
+    judges: Path = Path(".bencheval/judges"),
+    port: Annotated[int, typer.Option(min=1, max=65535)] = 8765,
+) -> None:
+    """Serve a loopback-only, read-only browser for actor/judge evidence."""
+    try:
+        with make_server(runs, judges, port) as server:
+            typer.echo(f"BenchEval UI: http://127.0.0.1:{server.server_port}/")
+            typer.echo("Read-only local artifacts. No model calls. Stop with Ctrl+C.")
+            server.serve_forever(poll_interval=0.2)
+    except KeyboardInterrupt:
+        typer.echo("UI stopped")
+    except OSError as error:
+        fail(error)
 
 
 @app.command()

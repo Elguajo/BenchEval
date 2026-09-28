@@ -14,6 +14,7 @@ import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 
+from bencheval.codex_context import controlled_context, skills_override
 from bencheval.contracts import Execution, ExecutionStatus, Scenario
 from bencheval.events import parse_trace
 from bencheval.runtime import run_process
@@ -177,6 +178,26 @@ class CodexExecutor:
                 ]
                 for key, value in OVERRIDES.items():
                     argv.extend(["-c", f"{key}={json.dumps(value)}"])
+                if scenario.executor.context_mode == "controlled":
+                    context = controlled_context(
+                        probe["binary"], cwd, child_environment(), OVERRIDES
+                    )
+                    argv.extend(["-c", skills_override(context["disabled_paths"])])
+                else:
+                    context = {
+                        "mode": "ambient",
+                        "enabled_skills": None,
+                        "warning": "Disable global skills/instructions; "
+                        "this run is not controlled",
+                    }
+                execution.metadata["context"] = {
+                    key: value
+                    for key, value in context.items()
+                    if key != "disabled_paths"
+                }
+                (artifact_dir / "codex-context.json").write_text(
+                    json.dumps(context, indent=2), encoding="utf-8"
+                )
                 if scenario.executor.model:
                     argv.extend(["--model", scenario.executor.model])
                 response_path = cwd / "response.txt"
@@ -207,7 +228,9 @@ class CodexExecutor:
                 trace = parse_trace(process.stdout)
                 execution.metadata["cli_warnings"] = trace.warnings
                 execution.metadata["ambient_skills"] = (
-                    "native CLI discovery; not isolated"
+                    "disabled and verified at preflight"
+                    if context["mode"] == "controlled"
+                    else "native CLI discovery; not isolated"
                 )
                 execution.events, execution.usage = trace.events, trace.usage
                 execution.trace_complete = trace.complete

@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
-from bencheval.contracts import RunResult
+from bencheval.contracts import Contract, RunResult
 
 
 class ArtifactError(ValueError):
@@ -27,7 +27,7 @@ def hash_evidence(directory: Path) -> dict[str, str]:
     }
 
 
-def save_result(directory: Path, result: RunResult) -> None:
+def save_result(directory: Path, result: Contract) -> None:
     temporary = directory / "result.json.tmp"
     with temporary.open("w", encoding="utf-8") as stream:
         stream.write(result.model_dump_json(indent=2))
@@ -40,12 +40,16 @@ def read_result(path: Path) -> RunResult:
     path = path / "result.json" if path.is_dir() else path
     try:
         result = RunResult.model_validate_json(path.read_text(encoding="utf-8"))
-        for name, expected in result.evidence_hashes.items():
-            evidence = path.parent / name
-            if Path(name).name != name or evidence.is_symlink():
-                raise ArtifactError(f"Unsafe evidence reference: {name}")
-            if hashlib.sha256(evidence.read_bytes()).hexdigest() != expected:
-                raise ArtifactError(f"Evidence changed since evaluation: {name}")
+        verify_evidence(path.parent, result.evidence_hashes)
         return result
     except (OSError, ValueError) as error:
         raise ArtifactError(f"{path}: {error}") from error
+
+
+def verify_evidence(directory: Path, hashes: dict[str, str]) -> None:
+    for name, expected in hashes.items():
+        evidence = directory / name
+        if Path(name).name != name or evidence.is_symlink():
+            raise ArtifactError(f"Unsafe evidence reference: {name}")
+        if hashlib.sha256(evidence.read_bytes()).hexdigest() != expected:
+            raise ArtifactError(f"Evidence changed since evaluation: {name}")

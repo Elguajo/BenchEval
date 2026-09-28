@@ -1,0 +1,11 @@
+provider: desktop
+criteria:
+  - id: instruction-compliance
+    axes: [instruction_fidelity]
+    severity: hard
+    requires: [response, instructions]
+    requirement: The response follows the explicit response requirements in the instruction snapshot.
+  - id: answer-quality
+    axes: [outcome]
+    severity: advisory
+    requirement: The response addresses the request correctly and without irrelevant content.

@@ -93,6 +93,7 @@ class ExecutorConfig(Contract):
     provider: Literal["codex"] = "codex"
     model: str | None = None
     timeout_seconds: float = Field(default=120, gt=0, le=3600)
+    context_mode: Literal["controlled", "ambient"] = "controlled"
 
 
 class Check(Contract):

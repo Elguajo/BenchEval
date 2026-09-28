@@ -1,0 +1,13 @@
+# Opt-in: sends actor evidence externally and may incur API charges, unlike Codex login.
+# Configure a provider supporting Chat Completions strict JSON-schema responses.
+provider: openai_compatible
+model: YOUR_MODEL
+base_url: https://api.openai.com/v1
+api_key_env: OPENAI_API_KEY
+allow_remote: true
+timeout_seconds: 120
+criteria:
+  - id: answer-quality
+    axes: [outcome]
+    severity: hard
+    requirement: The response addresses the request correctly and without irrelevant content.

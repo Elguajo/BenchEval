@@ -41,6 +41,13 @@ checks, CLI, artifacts, and the test suite are newly implemented here. Core has
 no runtime dependency on DeepEval or AgentEval. Python dependencies and their exact
 resolved versions are recorded in `uv.lock`.
 
+The per-invocation skill controller, independent judge contracts/providers,
+desktop hand-off and local web inspector are also BenchEval-owned code.
+The checked DeepEval Textual inspector and AgentEval CLI terminal reports informed
+the evidence layout; neither UI implementation nor commercial dashboard assets
+were copied. The README uses their broad onboarding structure, with original
+BenchEval text, examples and capability boundaries.
+
 For future adoption, inspect the specific component, review licensing, record its
 revision/content hash and tests, and adapt it separately. Do not bulk merge either
 upstream repository or copy its aggregate scoring assumptions.

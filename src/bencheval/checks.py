@@ -1,22 +1,9 @@
-import json
 import re
 
 from jsonschema import Draft202012Validator
 
 from bencheval.contracts import Check, CheckResult, Execution, ExecutionStatus, State
-
-
-def _unique_object(pairs):
-    value = {}
-    for key, item in pairs:
-        if key in value:
-            raise ValueError("Duplicate JSON key")
-        value[key] = item
-    return value
-
-
-def _invalid_constant(value):
-    raise ValueError(f"Non-JSON constant: {value}")
+from bencheval.json_utils import strict_json_loads
 
 
 def evaluate(check: Check, execution: Execution) -> CheckResult:
@@ -51,11 +38,7 @@ def evaluate(check: Check, execution: Execution) -> CheckResult:
         else:
             expected = "Response is JSON satisfying the declared JSON Schema"
             try:
-                value = json.loads(
-                    response,
-                    object_pairs_hook=_unique_object,
-                    parse_constant=_invalid_constant,
-                )
+                value = strict_json_loads(response)
                 error = next(
                     Draft202012Validator(check.json_schema).iter_errors(value), None
                 )

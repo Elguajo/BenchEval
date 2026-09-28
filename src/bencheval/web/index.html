@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BenchEval · Run inspector</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#detail-title">Skip to run details</a>
+  <header class="topbar">
+    <div><strong class="wordmark">BenchEval<span class="brand-dot">.</span></strong><span class="subtitle">Instruction-aware evaluation</span></div>
+    <span class="local-label">Local · Read-only</span>
+  </header>
+  <main class="workspace">
+    <aside class="sidebar" aria-label="Saved runs">
+      <div class="section-heading"><h1>Runs</h1><button id="refresh" type="button">Refresh</button></div>
+      <label for="search">Find a scenario or run</label>
+      <input id="search" type="search" placeholder="Search saved runs">
+      <label for="kind">Show</label>
+      <select id="kind"><option value="all">Actors and judges</option><option value="actor">Actor runs</option><option value="judge">Judge runs</option></select>
+      <p id="count" class="muted" role="status">Loading saved runs…</p>
+      <div id="runs" class="run-list"></div>
+    </aside>
+    <section id="detail" class="detail" aria-label="Run details" aria-live="polite">
+      <div class="empty"><p class="eyebrow">Evidence, not averages</p><h2 id="detail-title" tabindex="-1">Inspect what happened.</h2><p>Choose a saved run to see the outcome, instruction fidelity and observable behavior.</p></div>
+    </section>
+  </main>
+  <footer>Judges cannot override a proven hard-rule failure. Missing evidence is not a pass.</footer>
+</body>
+</html>
