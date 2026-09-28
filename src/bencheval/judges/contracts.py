@@ -7,9 +7,11 @@ from pydantic import Field, model_validator
 from bencheval.contracts import (
     Axis,
     CheckResult,
+    CleanSuccess,
     Contract,
     Execution,
     Identifier,
+    Verdict,
     Verdicts,
 )
 
@@ -93,7 +95,7 @@ class JudgeConfig(Contract):
 
 
 class JudgeJob(Contract):
-    version: Literal[1] = 1
+    version: Literal[2] = 2
     id: str
     source_path: str
     source_sha256: str
@@ -110,7 +112,7 @@ class JudgeJob(Contract):
 
 
 class JudgeResult(Contract):
-    version: Literal[1] = 1
+    version: Literal[2] = 2
     job_id: str
     actor_run_id: str
     source_sha256: str
@@ -119,5 +121,19 @@ class JudgeResult(Contract):
     invocation: Execution
     checks: list[CheckResult]
     verdicts: Verdicts
+    clean_success: CleanSuccess
     warnings: list[str]
     evidence_hashes: dict[str, str]
+
+    @model_validator(mode="after")
+    def consistent_success(self):
+        expected = {
+            Verdict.PASS: CleanSuccess.YES,
+            Verdict.FAIL: CleanSuccess.NO,
+            Verdict.INCONCLUSIVE: CleanSuccess.INCONCLUSIVE,
+        }
+        if self.verdicts.overall not in expected:
+            raise ValueError("Overall must be PASS, FAIL, or INCONCLUSIVE")
+        if self.clean_success != expected[self.verdicts.overall]:
+            raise ValueError("Clean Success must agree with Overall")
+        return self

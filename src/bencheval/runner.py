@@ -6,7 +6,7 @@ from typing import Protocol
 from bencheval import __version__
 from bencheval.artifacts import hash_evidence, new_directory, save_result
 from bencheval.checks import evaluate
-from bencheval.contracts import Execution, RunResult, Scenario
+from bencheval.contracts import CleanSuccess, Execution, RunResult, Scenario, Verdict
 from bencheval.executors.codex import CodexExecutor
 from bencheval.scenarios import digest, load_instructions, load_scenario, render_prompt
 from bencheval.verdicts import aggregate
@@ -37,7 +37,18 @@ def run_scenario(
         json.dumps([e.model_dump() for e in execution.events], indent=2),
         encoding="utf-8",
     )
+    (directory / "runtime.json").write_text(
+        json.dumps(
+            {
+                "status": execution.status.value,
+                "trace_complete": execution.trace_complete,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     checks = [evaluate(check, execution) for check in scenario.checks]
+    verdicts = aggregate(checks, execution.status)
     result = RunResult(
         run_id=directory.name,
         created_at=datetime.now(UTC).isoformat(),
@@ -47,7 +58,12 @@ def run_scenario(
         instructions=bundle,
         execution=execution,
         checks=checks,
-        verdicts=aggregate(checks, execution.status),
+        verdicts=verdicts,
+        clean_success={
+            Verdict.PASS: CleanSuccess.YES,
+            Verdict.FAIL: CleanSuccess.NO,
+            Verdict.INCONCLUSIVE: CleanSuccess.INCONCLUSIVE,
+        }[verdicts.overall],
         evidence_hashes=hash_evidence(directory),
     )
     save_result(directory, result)

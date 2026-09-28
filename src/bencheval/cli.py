@@ -77,24 +77,50 @@ def fail(error: Exception) -> None:
 
 
 def summarize(result: RunResult, path: Path) -> None:
-    typer.echo(f"Overall: {result.verdicts.overall}")
     typer.echo(f"Execution: {result.execution.status}")
     for axis, verdict in result.verdicts.axes.items():
         typer.echo(f"{axis}: {verdict}")
+    typer.echo(f"Overall: {result.verdicts.overall}")
+    typer.echo(f"Clean Success: {result.clean_success}")
+    typer.echo("Hard checks:")
     for check in result.checks:
+        if check.severity == "hard":
+            typer.echo(f"  {check.id}: {check.state} ({check.actual})")
+            for ref in check.evidence:
+                location = ref.source + (ref.locator or "")
+                typer.echo(f"    Evidence: {ref.id} [{ref.type}] {location}")
+    typer.echo("Advisories:")
+    for check in result.advisories:
         typer.echo(f"  {check.id}: {check.state} ({check.actual})")
+        for ref in check.evidence:
+            typer.echo(
+                f"    Evidence: {ref.id} [{ref.type}] {ref.source}{ref.locator or ''}"
+            )
     if result.execution.reason:
         typer.echo(f"Reason: {result.execution.reason}")
     typer.echo(f"Artifacts: {path.resolve()}")
 
 
 def summarize_judge(result: JudgeResult, path: Path) -> None:
-    typer.echo(f"Overall: {result.verdicts.overall} (actor checks + judge rubric)")
     typer.echo(f"Judge: {result.invocation.provider} / {result.invocation.status}")
     for axis, verdict in result.verdicts.axes.items():
         typer.echo(f"{axis}: {verdict}")
+    typer.echo(f"Overall: {result.verdicts.overall} (actor checks + judge rubric)")
+    typer.echo(f"Clean Success: {result.clean_success}")
+    typer.echo("Hard judge checks:")
     for check in result.checks:
-        typer.echo(f"  {check.id}: {check.state} ({check.actual})")
+        if check.severity == "hard":
+            typer.echo(f"  {check.id}: {check.state} ({check.actual})")
+            for ref in check.evidence:
+                location = ref.source + (ref.locator or "")
+                typer.echo(f"    Evidence: {ref.id} [{ref.type}] {location}")
+    typer.echo("Advisories:")
+    for check in result.checks:
+        if check.severity == "advisory":
+            typer.echo(f"  {check.id}: {check.state} ({check.actual})")
+            for ref in check.evidence:
+                location = ref.source + (ref.locator or "")
+                typer.echo(f"    Evidence: {ref.id} [{ref.type}] {location}")
     for warning in result.warnings:
         typer.echo(f"WARNING: {warning}")
     if result.invocation.reason:

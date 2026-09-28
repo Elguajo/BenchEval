@@ -1,6 +1,6 @@
 <h1 align="center">BenchEval</h1>
 <p align="center"><strong>Did it achieve the goal — and follow the instructions?</strong></p>
-<p align="center">Instruction-aware evaluation for LLMs and coding agents.</p>
+<p align="center">BenchEval is an instruction-aware benchmark runner for LLMs and coding agents.</p>
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
   <a href="#llm-judges">LLM judges</a> ·
@@ -43,12 +43,22 @@ Scenario + explicit instructions + policies
                      ↓
        Outcome / Instruction fidelity / Behavior
                      ↓
-           Overall verdict + local evidence
+       Axis verdicts + Clean Success + local evidence
 ```
 
-One proven hard-rule failure means **FAIL**. Missing mandatory evidence means
-**INCONCLUSIVE**, not a guessed pass. A judge cannot erase a deterministic failure.
-Advisory findings remain visible without changing the hard-rule gate.
+**Clean Success** is `YES` only when execution completes and all applicable hard
+outcome, instruction and behavior checks pass. Any established hard failure gives
+`NO`; unresolved required evaluation gives `INCONCLUSIVE`. Overall maps to
+`PASS`, `FAIL`, and `INCONCLUSIVE` respectively. Missing required evidence is
+inconclusive, never a guessed pass. A successful process exit alone is not a
+benchmark pass. Advisory findings remain visible but affect no axis verdict,
+Overall, or Clean Success. BenchEval has no averaged global AI quality score.
+
+At suite level, **Clean Success Rate (CSR)** is clean successes divided by **all
+scheduled attempts**. Timeouts, execution errors, unexecuted attempts and
+inconclusive evaluations stay in the denominator. An empty suite has undefined
+CSR (`null`). The suite result contract is present; the suite runner and
+comparison workflow remain future work.
 
 ## Features
 
@@ -62,7 +72,8 @@ Advisory findings remain visible without changing the hard-rule gate.
 - **Fixed checks:** exact text, substrings, regex, inline JSON Schema and observed
   no-tools checks. Prose policies alone do not create automatic checks.
 - **Evidence-first:** snapshots, raw runtime output, structured rubric decisions,
-  SHA-256 manifests, separate execution and evaluation status.
+  typed evidence references, SHA-256 manifests, separate execution and evaluation
+  status. Hashes detect changes; they are not tamper-proof attestation.
 - **Local web inspector:** runs, three axes, findings, responses, instructions,
   trace and context metadata. No cloud account, frontend framework or telemetry.
 
@@ -315,6 +326,7 @@ accurate capabilities and provenance/license records for reused source.
 ## Roadmap
 
 - [x] Codex response runner and deterministic three-axis verdicts.
+- [x] M0.5 result semantics: typed evidence, hard-only axes, Clean Success and CSR contract.
 - [x] Per-run Codex skill controls and explicit ambient warnings.
 - [x] Independent Codex judge, desktop hand-off, Ollama/API judge adapters.
 - [x] Local read-only web report inspector.

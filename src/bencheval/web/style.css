@@ -43,8 +43,10 @@ input, select { width: 100%; border: 1px solid var(--border); border-radius: 6px
 .empty { max-width: 520px; margin: 60px 0; }
 .empty p { color: var(--text-secondary); }
 .badge { font: 700 11px/1.3 var(--font-data); color: var(--state-unknown); border: 1px solid currentColor; border-radius: 4px; padding: 5px 7px; display: inline-block; white-space: nowrap; }
-.badge[data-state="PASS"] { color: var(--state-pass); }
-.badge[data-state="FAIL"], .badge[data-state="ERROR"], .badge[data-state="INVALID"] { color: var(--state-fail); }
+.badge[data-state="PASS"], .badge[data-state="YES"] { color: var(--state-pass); }
+.badge[data-state="FAIL"], .badge[data-state="NO"], .badge[data-state="ERROR"], .badge[data-state="INVALID"] { color: var(--state-fail); }
+.check.advisory { border-left: 3px solid var(--state-unknown); }
+.check.advisory .badge[data-state="FAIL"] { color: var(--state-unknown); }
 .axes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--border); border-radius: 8px; background: var(--surface-panel); margin: 24px 0; overflow: hidden; }
 .axis { padding: 22px; min-width: 0; }
 .axis + .axis { border-left: 1px solid var(--border); }

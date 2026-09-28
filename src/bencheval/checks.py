@@ -2,7 +2,15 @@ import re
 
 from jsonschema import Draft202012Validator
 
-from bencheval.contracts import Check, CheckResult, Execution, ExecutionStatus, State
+from bencheval.contracts import (
+    Check,
+    CheckResult,
+    EvidenceRef,
+    EvidenceType,
+    Execution,
+    ExecutionStatus,
+    State,
+)
 from bencheval.json_utils import strict_json_loads
 
 
@@ -10,22 +18,50 @@ def evaluate(check: Check, execution: Execution) -> CheckResult:
     state, actual, evidence = State.ERROR, "Execution did not complete", []
     expected = check.expected or check.pattern or check.type
     if check.type == "no_tools":
-        tools = [event for event in execution.events if event.tool_action]
-        evidence = ["events.json#" + event.id for event in tools]
+        tools = [
+            (index, event)
+            for index, event in enumerate(execution.events)
+            if event.tool_action
+        ]
+        evidence = [
+            EvidenceRef(
+                id=f"tool-event-{index}",
+                type=EvidenceType.TOOL_EVENT,
+                source="events.json",
+                locator=f"/{index}",
+            )
+            for index, _ in tools
+        ]
         expected = "No observed tool actions"
         if tools:
-            state, actual = State.FAIL, ", ".join(event.kind for event in tools)
+            state, actual = State.FAIL, ", ".join(event.kind for _, event in tools)
         elif execution.trace_complete:
             state, actual = (
                 State.PASS,
                 "Complete CLI event stream contains no tool action",
             )
-            evidence = ["events.json", "stdout.jsonl"]
+            evidence = [
+                EvidenceRef(
+                    id="event-stream",
+                    type=EvidenceType.TOOL_EVENT,
+                    source="events.json",
+                ),
+                EvidenceRef(
+                    id="runtime",
+                    type=EvidenceType.RUNTIME_METADATA,
+                    source="runtime.json",
+                    locator="/trace_complete",
+                ),
+            ]
         else:
             state, actual = State.NOT_OBSERVABLE, "CLI trace is absent or incomplete"
     elif execution.status == ExecutionStatus.COMPLETED:
         response = execution.response
-        evidence = ["response.txt"]
+        evidence = [
+            EvidenceRef(
+                id="response", type=EvidenceType.RESPONSE, source="response.txt"
+            )
+        ]
         if check.type == "equals":
             passed = response == check.expected
             actual = "Response equals expected text" if passed else "Response differs"

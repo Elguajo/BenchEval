@@ -1,6 +1,6 @@
 # BenchEval implementation plan
 
-Status: initial design contract; implementation evidence lives in
+Status: initial design contract with M0.5 result semantics frozen; implementation evidence lives in
 [current-status.md](current-status.md). The approved incremental scope now includes
 Codex-first judging, controlled skills and a read-only local web inspector.
 Prepared: 2026-09-28.
@@ -17,8 +17,8 @@ according to the supplied instructions and policies.
 | Instruction fidelity | Were applicable instructions and explicit requirements followed? | Response structure, instruction snapshots, rule checks |
 | Behavior | Did observable actions stay within the permitted scope? | Tool events, commands, file snapshots, diff, response claims |
 
-Keep axis verdicts and optional rubric scores separate. No weighted overall
-quality score is part of v1. One check can support several axes without being
+Keep axis verdicts and optional rubric scores separate. BenchEval has no averaged
+global AI quality score. One check can support several axes without being
 counted as multiple independent pieces of evidence.
 
 V1 supports two scenario kinds:
@@ -161,8 +161,10 @@ there is no tool trace. Final snapshots prove final-state differences, not that 
 file was never temporarily edited. A rule forbidding any edit requires suitable
 events or monitoring; absence of that coverage makes the rule unresolved.
 
-Primary suite metric: `PASS attempts / all scheduled attempts`, alongside counts
-of failures, inconclusive results, and unexecuted attempts. Never hide failed
+Primary suite metric: Clean Success Rate (`CleanSuccess.YES attempts / all scheduled
+attempts`), alongside counts of hard failures, inconclusive results, and execution
+failures or unexecuted attempts. Zero scheduled attempts yield undefined/null CSR.
+Never hide failed
 infrastructure by shrinking the denominator. Also show unique-scenario coverage
 and per-scenario repeat results; attempts are not independent new scenarios.
 
@@ -303,6 +305,28 @@ missing mandatory trace is `INCONCLUSIVE`; advisory scores cannot affect either.
 Acceptance: an installed CLI can run a small response scenario without an API key;
 no CLI/login yields an actionable execution status; malformed responses never pass.
 Fake-executor tests work offline. The live test is never part of default pytest.
+
+### M0.5 — Result semantics freeze (completed before full M2)
+
+- [x] Store `CleanSuccess` (`YES`, `NO`, `INCONCLUSIVE`) alongside Overall.
+  A hard failure dominates errors; incomplete execution or missing required
+  evidence without a hard failure is inconclusive. Completed applicable hard
+  success passes.
+- [x] Axis verdicts use hard checks only. Advisory findings remain visible and
+  cannot change axes, Overall, or Clean Success. An undeclared response behavior
+  axis is `NOT_OBSERVABLE`; explicit inapplicability is `NOT_APPLICABLE`.
+- [x] Use typed evidence references for deterministic and judge checks, with
+  stable IDs, preserved source/locator and artifact hashes. These hashes are
+  integrity references, not tamper-proof attestation.
+- [x] Add a minimal suite result contract. CSR uses every scheduled attempt;
+  execution failures and unexecuted attempts remain in its denominator. Counts
+  partition attempts with established hard failure taking precedence; original
+  execution status remains available on each run.
+- [x] Freeze cases A–I in offline decision-table and integration tests.
+
+Actor results and judge jobs/results use internal schema version 2. Version 1
+artifacts are rejected during inspection; they are not silently reinterpreted.
+The scenario schema remains version 1. Full suite execution/comparison remains M4.
 
 ### M2 — Coding-agent slice
 

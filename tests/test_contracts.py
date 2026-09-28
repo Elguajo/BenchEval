@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from bencheval.contracts import Scenario
+from bencheval.contracts import CheckResult, Scenario, SuiteResult
 from bencheval.scenarios import ScenarioError, load_instructions, load_scenario
 
 
@@ -40,6 +40,45 @@ from bencheval.scenarios import ScenarioError, load_instructions, load_scenario
 def test_invalid_configuration_rejected(scenario, update):
     with pytest.raises(ValidationError):
         Scenario.model_validate(scenario.model_dump() | update)
+
+
+def test_check_result_requires_typed_evidence_for_established_result():
+    base = {
+        "id": "answer",
+        "axes": ["outcome"],
+        "severity": "hard",
+        "state": "PASS",
+        "expected": "4",
+        "actual": "matched",
+    }
+    with pytest.raises(ValidationError, match="require evidence"):
+        CheckResult.model_validate(base)
+    with pytest.raises(ValidationError):
+        CheckResult.model_validate(base | {"evidence": ["response.txt"]})
+
+
+def test_suite_rejects_wrong_csr_and_uses_null_for_empty():
+    empty = SuiteResult(
+        suite_id="empty",
+        scheduled_attempts=0,
+        completed_attempts=0,
+        clean_successes=0,
+        failures=0,
+        inconclusive=0,
+        execution_failures=0,
+    )
+    assert empty.model_dump()["clean_success_rate"] is None
+    with pytest.raises(ValidationError, match="CSR must equal"):
+        SuiteResult(
+            suite_id="ten",
+            scheduled_attempts=10,
+            completed_attempts=9,
+            clean_successes=7,
+            failures=1,
+            inconclusive=1,
+            execution_failures=1,
+            clean_success_rate=0.875,
+        )
 
 
 def test_duplicate_and_contradictory_checks_rejected(scenario):

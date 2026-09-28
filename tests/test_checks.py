@@ -1,7 +1,15 @@
 import pytest
 
 from bencheval.checks import evaluate
-from bencheval.contracts import Check, Event, Execution, ExecutionStatus, State
+from bencheval.contracts import (
+    Check,
+    Event,
+    EvidenceRef,
+    EvidenceType,
+    Execution,
+    ExecutionStatus,
+    State,
+)
 
 
 @pytest.mark.parametrize(
@@ -30,7 +38,9 @@ def test_response_checks(kind, params, response, expected):
     execution = Execution(status=ExecutionStatus.COMPLETED, response=response)
     result = evaluate(check, execution)
     assert result.state == expected
-    assert result.evidence == ["response.txt"]
+    assert result.evidence == [
+        EvidenceRef(id="response", type=EvidenceType.RESPONSE, source="response.txt")
+    ]
 
 
 @pytest.mark.parametrize(
@@ -48,9 +58,21 @@ def test_no_tools_needs_evidence_even_for_plain_response():
     execution = Execution(status=ExecutionStatus.COMPLETED, response="4")
     assert evaluate(check, execution).state == State.NOT_OBSERVABLE
     execution.trace_complete = True
-    assert evaluate(check, execution).state == State.PASS
+    complete = evaluate(check, execution)
+    assert complete.state == State.PASS
+    assert [(ref.type, ref.source) for ref in complete.evidence] == [
+        (EvidenceType.TOOL_EVENT, "events.json"),
+        (EvidenceType.RUNTIME_METADATA, "runtime.json"),
+    ]
     execution.events = [Event(id="tool-1", kind="command_execution", tool_action=True)]
     execution.trace_complete = False
     result = evaluate(check, execution)
     assert result.state == State.FAIL
-    assert result.evidence == ["events.json#tool-1"]
+    assert result.evidence == [
+        EvidenceRef(
+            id="tool-event-0",
+            type=EvidenceType.TOOL_EVENT,
+            source="events.json",
+            locator="/0",
+        )
+    ]

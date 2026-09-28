@@ -8,7 +8,16 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
 from bencheval.artifacts import hash_evidence, save_result, verify_evidence
-from bencheval.contracts import CheckResult, Execution, ExecutionStatus, State
+from bencheval.contracts import (
+    CheckResult,
+    CleanSuccess,
+    EvidenceRef,
+    EvidenceType,
+    Execution,
+    ExecutionStatus,
+    State,
+    Verdict,
+)
 from bencheval.json_utils import strict_json_loads
 from bencheval.judges.contracts import JudgeConfig, JudgeResult
 from bencheval.judges.jobs import JudgeError, read_job, sha
@@ -72,7 +81,21 @@ def finish_job(path: Path, invocation: Execution) -> JudgeResult:
             decision = decisions[criterion.id]
             state = State(decision["state"])
             actual = decision["explanation"]
-            refs = ["job.json#evidence/" + ref for ref in decision["evidence"]]
+            refs = [
+                EvidenceRef(
+                    id=f"judge-{ref}",
+                    type={
+                        "request": EvidenceType.GENERIC_ARTIFACT,
+                        "response": EvidenceType.RESPONSE,
+                        "instructions": EvidenceType.INSTRUCTION,
+                        "trace": EvidenceType.TOOL_EVENT,
+                    }[ref],
+                    source="job.json",
+                    locator=f"/evidence/{ref}",
+                    sha256=job.evidence_sha256[ref],
+                )
+                for ref in decision["evidence"]
+            ]
             if state != State.NOT_OBSERVABLE and not set(criterion.requires).issubset(
                 decision["evidence"]
             ):
@@ -97,6 +120,7 @@ def finish_job(path: Path, invocation: Execution) -> JudgeResult:
         warnings.append(
             "Manual desktop import: judge identity, auth and ambient context unverified"
         )
+    verdicts = aggregate(job.source_checks + checks, ExecutionStatus(job.actor_status))
     result = JudgeResult(
         job_id=job.id,
         actor_run_id=job.actor_run_id,
@@ -105,9 +129,12 @@ def finish_job(path: Path, invocation: Execution) -> JudgeResult:
         rubric_sha256=sha(job.config.model_dump_json()),
         invocation=invocation,
         checks=checks,
-        verdicts=aggregate(
-            job.source_checks + checks, ExecutionStatus(job.actor_status)
-        ),
+        verdicts=verdicts,
+        clean_success={
+            Verdict.PASS: CleanSuccess.YES,
+            Verdict.FAIL: CleanSuccess.NO,
+            Verdict.INCONCLUSIVE: CleanSuccess.INCONCLUSIVE,
+        }[verdicts.overall],
         warnings=warnings,
         evidence_hashes=hash_evidence(directory),
     )

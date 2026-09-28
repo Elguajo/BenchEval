@@ -1,10 +1,42 @@
 # Implementation status — 2026-09-28
 
-Session classification: **PHASE COMPLETE** for the requested Codex-first
-judge/context/UI increment. The broader project is **IN PROGRESS**:
+Session classification: **M0.5 RESULT SEMANTICS IMPLEMENTED** after the earlier
+Codex-first judge/context/UI increment. The broader project is **IN PROGRESS**:
 coding-agent scenarios, suites/comparison, Claude and the DeepEval bridge remain
 undelivered. This checkout has no Progressive Context Kit, QUALITY_PROTOCOL.md
 or HANDOFF_PROTOCOL.md; this file preserves compact acceptance evidence.
+
+## M0.5 result semantics freeze
+
+- `RunResult` stores execution separately from axis/Overall verdicts and explicit
+  `CleanSuccess` (`YES`, `NO`, `INCONCLUSIVE`). A hard failure gives `NO`; without
+  one, incomplete execution or unresolved required evidence gives
+  `INCONCLUSIVE`; complete applicable hard success gives `YES`.
+- Axes aggregate only hard checks. Advisory findings remain in checks and appear
+  separately in CLI/UI; they do not affect axes, Overall or Clean Success.
+  Response behavior with no declared hard behavior check remains
+  `NOT_OBSERVABLE`, not an invented pass.
+- Check evidence uses typed `EvidenceRef` values. Response checks cite
+  `response.txt`; observed tool actions cite indexed `events.json` entries;
+  a no-tools pass cites the event stream and preserved `trace_complete` runtime
+  metadata. Existing artifact file hashes are integrity checks, not attestations.
+- The minimal `SuiteResult` contract defines CSR as `clean_successes /
+  scheduled_attempts`, including failed, inconclusive, execution-failed and
+  unexecuted attempts in the denominator. Zero scheduled attempts give null CSR.
+  Suite execution and comparison remain pending.
+- Actor result, judge job and judge result schemas are now version 2. Old version
+  1 artifacts are rejected rather than reinterpreted; scenario schema is still
+  version 1. Existing ignored local artifacts remain untouched.
+- Offline tests cover decision-table cases A–I and actor/judge/CLI/UI paths.
+  No live inference was used for this increment. Full M2 worktree and
+  coding-agent execution have not begun.
+
+Observed M0.5 verification: `uv run pytest` **928 passed, 1 live test
+deselected**; `uv run ruff check .` passed; `uv run ruff format --check .`,
+`node --check src/bencheval/web/app.js`, `git diff --check`, and
+`uv run bencheval validate examples/response/arithmetic.yaml` passed. A temporary
+offline actor artifact was inspected with the actual `bencheval inspect` command.
+The counts below document the *earlier* judge/context/UI increment.
 
 ## Delivered
 

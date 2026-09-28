@@ -3,11 +3,17 @@
 import json
 import re
 from enum import StrEnum
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Self
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 
 class Contract(BaseModel):
@@ -34,6 +40,25 @@ class Verdict(StrEnum):
     INCONCLUSIVE = "INCONCLUSIVE"
     NOT_OBSERVABLE = "NOT_OBSERVABLE"
     NOT_APPLICABLE = "NOT_APPLICABLE"
+
+
+class CleanSuccess(StrEnum):
+    YES = "YES"
+    NO = "NO"
+    INCONCLUSIVE = "INCONCLUSIVE"
+
+
+class EvidenceType(StrEnum):
+    RESPONSE = "response"
+    INSTRUCTION = "instruction"
+    TOOL_EVENT = "tool_event"
+    GIT_DIFF = "git_diff"
+    FILE_SNAPSHOT = "file_snapshot"
+    COMMAND_LOG = "command_log"
+    TEST_RESULT = "test_result"
+    JUDGE_FINDING = "judge_finding"
+    RUNTIME_METADATA = "runtime_metadata"
+    GENERIC_ARTIFACT = "generic_artifact"
 
 
 class ExecutionStatus(StrEnum):
@@ -210,6 +235,14 @@ class Execution(Contract):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class EvidenceRef(Contract):
+    id: Identifier
+    type: EvidenceType
+    source: str = Field(min_length=1)
+    locator: str | None = None
+    sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+
+
 class CheckResult(Contract):
     id: str
     axes: list[Axis]
@@ -217,8 +250,16 @@ class CheckResult(Contract):
     state: State
     expected: str
     actual: str
-    evidence: list[str] = Field(default_factory=list)
+    evidence: list[EvidenceRef] = Field(default_factory=list)
     checker_version: str = "1"
+
+    @model_validator(mode="after")
+    def established_finding_has_evidence(self):
+        if self.state in (State.PASS, State.FAIL) and not self.evidence:
+            raise ValueError("PASS/FAIL checks require evidence")
+        if len({ref.id for ref in self.evidence}) != len(self.evidence):
+            raise ValueError("Evidence IDs within a check must be unique")
+        return self
 
 
 class Verdicts(Contract):
@@ -227,7 +268,7 @@ class Verdicts(Contract):
 
 
 class RunResult(Contract):
-    version: Literal[1] = 1
+    version: Literal[2] = 2
     run_id: str
     created_at: str
     bencheval_version: str
@@ -237,4 +278,100 @@ class RunResult(Contract):
     execution: Execution
     checks: list[CheckResult]
     verdicts: Verdicts
+    clean_success: CleanSuccess
     evidence_hashes: dict[str, str]
+
+    @property
+    def advisories(self) -> list[CheckResult]:
+        return [check for check in self.checks if check.severity == "advisory"]
+
+    @model_validator(mode="after")
+    def consistent_success(self):
+        expected = {
+            Verdict.PASS: CleanSuccess.YES,
+            Verdict.FAIL: CleanSuccess.NO,
+            Verdict.INCONCLUSIVE: CleanSuccess.INCONCLUSIVE,
+        }
+        if self.verdicts.overall not in expected:
+            raise ValueError("Overall must be PASS, FAIL, or INCONCLUSIVE")
+        if self.clean_success != expected[self.verdicts.overall]:
+            raise ValueError("Clean Success must agree with Overall")
+        if (
+            self.clean_success == CleanSuccess.YES
+            and self.execution.status != ExecutionStatus.COMPLETED
+        ):
+            raise ValueError("Clean Success YES requires completed execution")
+        if any(
+            ref.source not in self.evidence_hashes
+            for check in self.checks
+            for ref in check.evidence
+        ):
+            raise ValueError("Check evidence source is absent from artifact manifest")
+        return self
+
+
+class SuiteResult(Contract):
+    version: Literal[1] = 1
+    suite_id: Identifier
+    scheduled_attempts: int = Field(ge=0)
+    completed_attempts: int = Field(ge=0)
+    clean_successes: int = Field(ge=0)
+    failures: int = Field(ge=0)
+    inconclusive: int = Field(ge=0)
+    execution_failures: int = Field(ge=0)
+    clean_success_rate: float | None = Field(default=None, ge=0, le=1)
+
+    @classmethod
+    def from_attempts(
+        cls, suite_id: str, scheduled_attempts: int, attempts: list[RunResult]
+    ) -> Self:
+        """Partition hard failures, successes, completed unknowns, then run errors.
+
+        An established hard failure keeps its failure bucket even if execution
+        also stopped early. Per-attempt execution status remains in RunResult.
+        """
+        if len(attempts) > scheduled_attempts:
+            raise ValueError("More recorded attempts than scheduled attempts")
+        successes = sum(r.clean_success == CleanSuccess.YES for r in attempts)
+        failures = sum(r.clean_success == CleanSuccess.NO for r in attempts)
+        inconclusive = sum(
+            r.clean_success == CleanSuccess.INCONCLUSIVE
+            and r.execution.status == ExecutionStatus.COMPLETED
+            for r in attempts
+        )
+        execution_failures = scheduled_attempts - successes - failures - inconclusive
+        return cls(
+            suite_id=suite_id,
+            scheduled_attempts=scheduled_attempts,
+            completed_attempts=sum(
+                r.execution.status == ExecutionStatus.COMPLETED for r in attempts
+            ),
+            clean_successes=successes,
+            failures=failures,
+            inconclusive=inconclusive,
+            execution_failures=execution_failures,
+        )
+
+    @model_validator(mode="after")
+    def valid_counts(self):
+        if self.completed_attempts > self.scheduled_attempts:
+            raise ValueError("Completed attempts exceed scheduled attempts")
+        if (
+            self.clean_successes
+            + self.failures
+            + self.inconclusive
+            + self.execution_failures
+            != self.scheduled_attempts
+        ):
+            raise ValueError("Attempt categories must cover all scheduled attempts")
+        if self.clean_successes + self.inconclusive > self.completed_attempts:
+            raise ValueError("Completed result counts exceed completed attempts")
+        expected = (
+            self.clean_successes / self.scheduled_attempts
+            if self.scheduled_attempts
+            else None
+        )
+        if self.clean_success_rate is not None and self.clean_success_rate != expected:
+            raise ValueError("CSR must equal clean successes / scheduled attempts")
+        self.clean_success_rate = expected
+        return self

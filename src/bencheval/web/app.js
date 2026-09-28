@@ -5,7 +5,7 @@ let selected = null;
 let detailRequest = 0;
 let panelId = 0;
 const axisLabels = {outcome: "Outcome", instruction_fidelity: "Instruction fidelity", behavior: "Behavior"};
-const knownStates = new Set(["PASS", "FAIL", "INCONCLUSIVE", "NOT_OBSERVABLE", "NOT_APPLICABLE", "ERROR", "PENDING", "INVALID"]);
+const knownStates = new Set(["PASS", "FAIL", "YES", "NO", "INCONCLUSIVE", "NOT_OBSERVABLE", "NOT_APPLICABLE", "ERROR", "PENDING", "INVALID"]);
 function element(tag, text, className) {
   const node = document.createElement(tag);
   if (text !== undefined) node.textContent = String(text);
@@ -46,6 +46,17 @@ function block(title, value) {
   const section = element("section", undefined, "evidence-block");
   section.append(element("h3", title), element("pre", typeof value === "string" ? value : JSON.stringify(value, null, 2)));
   return section;
+}
+function evidenceLabel(ref) {
+  return `${ref.id} [${ref.type}] ${ref.source}${ref.locator || ""}`;
+}
+function checkDisclosure(check, advisory = false) {
+  const line = element("span", undefined, "check-heading");
+  line.append(element("span", check.id), badge(check.state), element("span", advisory ? "advisory" : "hard", "severity"));
+  return disclosure(line, advisory ? "check advisory" : "check", [element("p", check.actual), block("Requirement", check.expected),
+    element("p", `Axes: ${check.axes.map(axis => axisLabels[axis]).join(" · ")}`, "muted"),
+    element("p", `Evidence: ${check.evidence.map(evidenceLabel).join(", ") || "not available"}`, "run-id")],
+  !advisory && (check.state === "FAIL" || check.state === "ERROR"));
 }
 function disclosure(title, className, children, open = false) {
   const section = element("section", undefined, className);
@@ -99,18 +110,17 @@ async function selectRun(run) {
       axes.append(card);
     }
     fragment.append(axes);
+    const summary = element("p", undefined, "muted");
+    summary.append(element("strong", "Overall: "), badge(data.verdicts ? data.verdicts.overall : "PENDING"),
+      element("strong", "  Clean Success: "), badge(data.clean_success || "PENDING"));
+    fragment.append(summary);
     for (const warning of data.warnings) fragment.append(element("p", warning, "notice"));
-    fragment.append(element("h3", "Checks and findings", "section-title"));
+    fragment.append(element("h3", "Hard checks", "section-title"));
     if (!data.checks.length) fragment.append(element("p", "No verdict yet. Exported jobs require a judge run or desktop reply import.", "muted"));
-    for (const check of data.checks) {
-      const line = element("span", undefined, "check-heading");
-      line.append(element("span", check.id), badge(check.state), element("span", check.severity, "severity"));
-      const item = disclosure(line, "check", [element("p", check.actual), block("Requirement", check.expected),
-        element("p", `Axes: ${check.axes.map(axis => axisLabels[axis]).join(" · ")}`, "muted"),
-        element("p", `Evidence: ${check.evidence.join(", ") || "not available"}`, "run-id")],
-        check.state === "FAIL" || check.state === "ERROR");
-      fragment.append(item);
-    }
+    for (const check of data.checks) fragment.append(checkDisclosure(check));
+    fragment.append(element("h3", "Advisories (do not affect verdicts)", "section-title"));
+    if (!data.advisories.length) fragment.append(element("p", "None", "muted"));
+    for (const check of data.advisories) fragment.append(checkDisclosure(check, true));
     fragment.append(element("h3", "Preserved evidence", "section-title"));
     for (const [name, content] of Object.entries(data.evidence)) {
       fragment.append(disclosure(name, "evidence", [block(name, content)], name === "response"));

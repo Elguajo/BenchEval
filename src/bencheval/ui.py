@@ -37,7 +37,11 @@ class ArtifactBrowser:
                 "name": result.scenario.id,
                 "status": result.execution.status.value,
                 "verdicts": result.verdicts.model_dump(),
-                "checks": [c.model_dump() for c in result.checks],
+                "clean_success": result.clean_success.value,
+                "checks": [
+                    c.model_dump() for c in result.checks if c.severity == "hard"
+                ],
+                "advisories": [c.model_dump() for c in result.advisories],
                 "evidence": {
                     "request": result.scenario.prompt,
                     "response": result.execution.response,
@@ -66,7 +70,9 @@ class ArtifactBrowser:
                 "name": job.actor_run_id,
                 "status": "awaiting verdict",
                 "verdicts": None,
+                "clean_success": None,
                 "checks": [],
+                "advisories": [],
                 "evidence": job.evidence,
                 "metadata": {"provider": job.config.provider},
                 "warnings": [
@@ -82,7 +88,17 @@ class ArtifactBrowser:
             "name": job.actor_run_id,
             "status": result.invocation.status.value,
             "verdicts": result.verdicts.model_dump(),
-            "checks": [c.model_dump() for c in job.source_checks + result.checks],
+            "clean_success": result.clean_success.value,
+            "checks": [
+                c.model_dump()
+                for c in job.source_checks + result.checks
+                if c.severity == "hard"
+            ],
+            "advisories": [
+                c.model_dump()
+                for c in job.source_checks + result.checks
+                if c.severity == "advisory"
+            ],
             "evidence": {**job.evidence, "judge response": result.invocation.response},
             "metadata": result.invocation.model_dump(exclude={"response", "events"}),
             "warnings": result.warnings,

@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 from datetime import UTC, datetime
 from pathlib import Path
@@ -39,7 +40,14 @@ def save_result(directory: Path, result: Contract) -> None:
 def read_result(path: Path) -> RunResult:
     path = path / "result.json" if path.is_dir() else path
     try:
-        result = RunResult.model_validate_json(path.read_text(encoding="utf-8"))
+        value = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(value, dict):
+            raise ArtifactError("Actor result must be a JSON object")
+        if value.get("version") != 2:
+            raise ArtifactError(
+                f"Unsupported actor result version {value.get('version')}; expected 2"
+            )
+        result = RunResult.model_validate(value)
         verify_evidence(path.parent, result.evidence_hashes)
         return result
     except (OSError, ValueError) as error:

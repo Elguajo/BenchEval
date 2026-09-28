@@ -4,6 +4,8 @@ import threading
 
 import pytest
 
+from bencheval.contracts import Check, Execution, ExecutionStatus
+from bencheval.runner import run_scenario
 from bencheval.ui import ArtifactBrowser, make_server
 
 
@@ -15,9 +17,37 @@ def test_artifact_browser_lists_actor_and_judge_without_inference(make_job):
     assert {run["overall"] for run in entries["runs"]} == {"PASS", "PENDING"}
     actor = browser.detail("actor", source.name)
     assert actor["verified"] and actor["evidence"]["response"] == "4"
+    assert actor["clean_success"] == "YES"
+    assert actor["checks"][0]["evidence"][0]["type"] == "response"
     assert any("ambient" in warning for warning in actor["warnings"])
     judge = browser.detail("judge", directory.name)
     assert judge["actor_run_id"] == job.actor_run_id
+
+
+def test_browser_separates_advisory_from_hard_checks(scenario, tmp_path):
+    scenario.checks.append(
+        Check(
+            id="style",
+            axes=["instruction_fidelity"],
+            severity="advisory",
+            type="equals",
+            expected="5",
+        )
+    )
+    path = tmp_path / "scenario.json"
+    path.write_text(scenario.model_dump_json())
+
+    class OfflineExecutor:
+        def run(self, scenario, prompt, artifact_dir):
+            return Execution(status=ExecutionStatus.COMPLETED, response="4")
+
+    _, directory = run_scenario(path, tmp_path / "runs", executor=OfflineExecutor())
+    detail = ArtifactBrowser(directory.parent, tmp_path / "judges").detail(
+        "actor", directory.name
+    )
+    assert [check["id"] for check in detail["checks"]] == ["answer"]
+    assert [check["id"] for check in detail["advisories"]] == ["style"]
+    assert detail["clean_success"] == "YES"
 
 
 def test_path_traversal_and_symlinks_are_not_served(tmp_path):
