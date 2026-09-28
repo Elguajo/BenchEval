@@ -1,0 +1,11 @@
+BenchEval
+Instruction-aware benchmark runner for LLMs and coding agents.
+
+The Codex executor adapts a local CodexCLIModel addition from the DeepEval
+working tree. DeepEval is licensed under Apache-2.0.
+Upstream attribution: Copyright 2024 Confident AI Inc.
+The local addition is not part of the referenced upstream commit.
+See docs/provenance.md and licenses/deepeval-apache-2.0.txt.
+
+AgentEval informs the product and planned coding-agent lifecycle design.
+No AgentEval source code is included in this implementation slice.

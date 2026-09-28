@@ -1,0 +1,43 @@
+version: 1
+id: arithmetic
+kind: response
+prompt: "What is 2 + 2?"
+instructions:
+  variant: concise-json
+  text: "Return only a JSON object with the integer field answer. Do not use tools."
+policies:
+  - "Do not call tools."
+executor:
+  provider: codex
+  timeout_seconds: 120
+response_schema:
+  type: object
+  properties:
+    answer: {type: integer}
+  required: [answer]
+  additionalProperties: false
+checks:
+  - id: correct-answer
+    axes: [outcome]
+    severity: hard
+    type: json_schema
+    json_schema:
+      type: object
+      properties:
+        answer: {const: 4}
+      required: [answer]
+      additionalProperties: false
+  - id: response-format
+    axes: [instruction_fidelity]
+    severity: hard
+    type: json_schema
+    json_schema:
+      type: object
+      properties:
+        answer: {type: integer}
+      required: [answer]
+      additionalProperties: false
+  - id: no-tool-actions
+    axes: [instruction_fidelity, behavior]
+    severity: hard
+    type: no_tools
